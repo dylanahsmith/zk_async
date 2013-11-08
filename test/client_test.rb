@@ -33,9 +33,13 @@ class ClientTest < ZkAsync::TestCase
   end
 
   def test_children
-    assert_equal [], client.children("/").get!
-    client.create("/foo", :ephemeral => true)
-    assert_equal ["foo"], client.children("/").get!
+    client.create("/dir")
+    assert_equal [], client.children("/dir").get!
+    client.create("/dir/foo")
+    assert_equal ["foo"], client.children("/dir").get!
+  ensure
+    client.delete("/dir")
+    client.delete("/dir/foo").wait
   end
 
   def test_stat
@@ -56,5 +60,63 @@ class ClientTest < ZkAsync::TestCase
     client.create("/foo", :ephemeral => true)
     client.delete("/foo")
     assert_equal ZK::Exceptions::NoNode, client.stat("/foo").error
+  end
+
+  def test_mkdir_p
+    path = "/a/b/c/d/e"
+    mkdir_result = client.mkdir_p(path)
+    assert_equal true, mkdir_result.get
+
+    stat = client.stat(path).get
+    assert_equal true, stat.exists
+  ensure
+    until path == "/a"
+      client.delete(path)
+      path = File.dirname(path)
+    end
+    client.delete(path).wait
+  end
+
+  def test_mkdir_p
+    path = "/a/b/c/d/e"
+    mkdir_result = client.mkdir_p(path)
+    assert_equal true, mkdir_result.get!
+
+    stat = client.stat(path).get!
+    assert_equal true, stat.exists
+  ensure
+    delete_empty_path(path)
+  end
+
+  def test_create_path
+    path = "/a/b/c/d/e"
+    assert_equal path, client.create_path(path, :data => "sub data", :ephemeral => true).get!
+    assert_equal "sub data", client.get(path).get![0]
+    data, stat = client.get("/a/b/c/d").get!
+    assert_equal true, stat.exists
+    assert_equal "", data
+  ensure
+    delete_empty_path(path)
+  end
+
+  def test_rm_rf
+    client.create_path("/a/b/c/d/e").wait
+    client.create("/a/b/c/d/f")
+    client.create("/a/b/c/g")
+    client.create("/a/b/h")
+    client.create("/a/i")
+    delete_count, error = client.rm_rf("/a/b").get
+    assert_equal 7, delete_count
+    assert_equal nil, error
+    assert_equal 2, client.rm_rf("/a").get!
+  end
+
+  private
+
+  def delete_empty_path(path)
+    until path == "/"
+      client.delete(path)
+      path = File.dirname(path)
+    end
   end
 end

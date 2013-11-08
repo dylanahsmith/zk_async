@@ -70,6 +70,7 @@ class ZkAsync::Result
     on_finished(&block) if block_given?
 
     pending = results.length
+    return self.set(true, nil) if pending == 0
     first_error = nil
     callback = proc do |_, error|
       pending -= 1
