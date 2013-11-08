@@ -1,5 +1,4 @@
-require "zk_async/version"
-
 module ZkAsync
-  # Your code goes here...
+  autoload :Result, 'zk_async/result'
+  autoload :VERSION, 'zk_async/version'
 end

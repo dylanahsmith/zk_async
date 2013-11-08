@@ -1,6 +1,6 @@
 # ZkAsync
 
-TODO: Write a gem description
+High-level asynchronous zookeeper client
 
 ## Installation
 
