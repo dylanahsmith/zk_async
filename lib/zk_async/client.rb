@@ -77,6 +77,14 @@ class ZkAsync::Client
     ZkAsync::Result.new(&block)
   end
 
+  def shared_locker(*args)
+    ZkAsync::Locker::Shared.new(self, *args)
+  end
+
+  def exclusive_locker(*args)
+    ZkAsync::Locker::Exclusive.new(self, *args)
+  end
+
   private
 
   class RequestCallback < Struct.new(:result, :method_name)
