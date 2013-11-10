@@ -9,47 +9,27 @@ class ZkAsync::Locker::Base
     @locked = false
   end
 
-  def lock(options={}, &block)
+  def lock(options={})
     raise NotImplementedError, "Blocking locking isn't supported yet" if options[:wait] != false
-    result = client.result(&block)
-    if @locked
-      result.set(true)
-      return result
-    end
+    return client.result(true) if @locked
     data = options[:data] || ''
-    client.create_path("#{root_lock_path}/#{lock_prefix}", :data => data, :ephemeral => true, :sequence => true) do |lock_path, error|
+    client.create_path("#{root_lock_path}/#{lock_prefix}", :data => data, :ephemeral => true, :sequence => true).chain! do |lock_path, result|
       @lock_path = lock_path
-      if error
-        result.set_error(error)
-      else
-        client.children(root_lock_path) do |children, error|
-          if error
-            result.set_error(error)
-          else
-            blocking_locks = self.blocking_locks(children)
-            @locked = blocking_locks.empty?
-            result.set(@locked)
-          end
-        end
+      client.children(root_lock_path).chain!(result) do |children, error|
+        blocking_locks = self.blocking_locks(children)
+        @locked = blocking_locks.empty?
+        result.set(@locked)
       end
     end
-    result
   end
 
-  def unlock(&block)
-    result = client.result(&block)
-    if !@lock_path
-      result.set(false)
-      return result
+  def unlock
+    return client.result(false) if !@lock_path
+    client.delete(@lock_path).chain! do |value, result|
+      @lock_path = nil
+      @locked = false
+      result.set(true)
     end
-    client.delete(@lock_path) do |value, error|
-      unless error
-        @lock_path = nil
-        @locked = false
-      end
-      result.set(!error, error)
-    end
-    result
   end
 
   protected

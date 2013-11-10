@@ -1,11 +1,11 @@
 class ZkAsync::Result
   attr_reader :finished
 
-  def initialize(&block)
+  def initialize
     @value = nil
     @error = nil
     @finished = false
-    @callbacks = block ? [block] : []
+    @callbacks = []
     @monitor = Monitor.new
     @wait_cond = @monitor.new_cond
   end
@@ -66,9 +66,29 @@ class ZkAsync::Result
     self
   end
 
-  def group(results, &block)
-    on_finished(&block) if block_given?
+  def chain(result=nil, &block)
+    result ||= self.class.new
+    self.on_finished do |value, error|
+      if block_given?
+        yield value, error, result
+      else
+        result.set(value, error)
+      end
+    end
+    result
+  end
 
+  def chain!(result=nil, &block)
+    chain(result) do |value, error, result|
+      if error
+        result.set_error(error)
+      else
+        yield value, result
+      end
+    end
+  end
+
+  def group(results)
     pending = results.length
     return self.set(true, nil) if pending == 0
     first_error = nil

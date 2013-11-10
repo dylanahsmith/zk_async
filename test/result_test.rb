@@ -27,17 +27,6 @@ class ResultTest < ZkAsync::TestCase
     end
   end
 
-  def test_initialize_with_block
-    call_count = 0
-    result = ZkAsync::Result.new do |value, error|
-      call_count += 1
-      assert_equal "hello block", value
-      assert_equal nil, error
-    end
-    result.set("hello block")
-    assert_equal 1, call_count
-  end
-
   def test_on_finished
     call_count = 0
     result = ZkAsync::Result.new
@@ -58,6 +47,39 @@ class ResultTest < ZkAsync::TestCase
       assert_equal "hello block", value
     end
     assert_equal 1, call_count
+  end
+
+  def test_chain_to_new_result
+    result1 = ZkAsync::Result.new
+    result2 = result1.chain do |value, error, result|
+      result.set(value + 1)
+    end
+    assert_equal false, result2.finished
+    result1.set(1)
+    assert_equal true, result2.finished
+    assert_equal 2, result2.get!
+  end
+
+  def test_chain_to_existing_result
+    result2 = ZkAsync::Result.new
+    result1 = ZkAsync::Result.new
+    result1.chain(result2)
+    assert_equal false, result2.finished
+    result1.set(1)
+    assert_equal true, result2.finished
+    assert_equal 1, result2.get!
+  end
+
+  def test_chain_to_existing_result_with_block
+    result1 = ZkAsync::Result.new
+    result2 = ZkAsync::Result.new
+    result1.chain(result2) do |value, error|
+      result2.set(value + 1, error)
+    end
+    assert_equal false, result2.finished
+    result1.set(1)
+    assert_equal true, result2.finished
+    assert_equal 2, result2.get!
   end
 
   def test_wait
