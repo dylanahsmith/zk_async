@@ -13,54 +13,30 @@ class ZkAsync::Client
   def set_acl(*args, &block); send_request(__method__, *args); end
 
   def create_path(path, options={})
-    create(path, options).chain do |node_path, error, result|
-      if error == ZK::Exceptions::NoNode && path != "/"
-        mkdir_p(File.dirname(path)).chain!(result) do |_, error|
-          create(path, options).chain(result)
-        end
-      else
-        result.set(node_path, error)
-      end
+    create(path, options).rescue(ZK::Exceptions::NoNode) do |exc|
+      raise exc if path == "/"
+      mkdir_p(File.dirname(path))
+        .chain { create(path, options) }
     end
   end
 
   def mkdir_p(path)
-    create(path).chain do |_, error, result|
-      if error == ZK::Exceptions::NodeExists
-        result.set(true)
-      elsif error == ZK::Exceptions::NoNode && path != "/"
-        mkdir_p(File.dirname(path)).chain!(result) do |value|
-          mkdir_p(path).chain(result)
-        end
-      else
-        result.set(!error, error)
+    create(path)
+      .rescue(ZK::Exceptions::NodeExists)
+      .rescue(ZK::Exceptions::NoNode) do
+        raise exc if path == "/"
+        mkdir_p(File.dirname(path)).chain{ mkdir_p(path) }
       end
-    end
   end
 
   def rm_rf(path)
-    self.children(path).chain do |children, error, result|
-      if error
-        result.set(0, error)
-      else
-        subresults = children.map{ |child| rm_rf("#{path}/#{child}") }
-        self.result_group(subresults).chain(result) do |_, error|
-          delete_count = subresults.reduce(0){ |t, r| t + r.get.first }
-          if error
-            result.set(delete_count, error)
-          else
-            delete(path).chain(result) do |subresult, error|
-              delete_count += 1 unless error
-              result.set(delete_count, error)
-            end
-          end
-        end
-      end
-    end
+    self.children(path)
+      .chain { |children| children.map{ |child| rm_rf("#{path}/#{child}") } }
+      .chain { delete(path) }
   end
 
-  def result(value, error=nil)
-    ZkAsync::Result.new.set(value, error)
+  def result(value)
+    ZkAsync::Result.new.set(value)
   end
 
   def result_group(results)
@@ -86,10 +62,13 @@ class ZkAsync::Client
     def call(res_hash)
       value = translate_response(res_hash)
       error_code = res_hash[:rc]
-      error = error_code == 0 ? nil : ZK::Exceptions::KeeperException.by_code(error_code)
-      result.set(value, error)
+      if error_code == 0
+        result.set(value)
+      else
+        result.set_exception(ZK::Exceptions::KeeperException.by_code(error_code))
+      end
     rescue Exception => exc
-      result.set_error(exc) unless result.finished
+      result.set_exception(exc) unless result.set?
       raise
     end
 

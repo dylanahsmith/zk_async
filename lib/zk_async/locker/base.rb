@@ -13,22 +13,22 @@ class ZkAsync::Locker::Base
     raise NotImplementedError, "Blocking locking isn't supported yet" if options[:wait] != false
     return client.result(true) if @locked
     data = options[:data] || ''
-    client.create_path("#{root_lock_path}/#{lock_prefix}", :data => data, :ephemeral => true, :sequence => true).chain! do |lock_path, result|
+    client.create_path("#{root_lock_path}/#{lock_prefix}", :data => data, :ephemeral => true, :sequence => true).chain do |lock_path|
       @lock_path = lock_path
-      client.children(root_lock_path).chain!(result) do |children, error|
+      client.children(root_lock_path).chain do |children|
         blocking_locks = self.blocking_locks(children)
         @locked = blocking_locks.empty?
-        result.set(@locked)
+        @locked
       end
     end
   end
 
   def unlock
     return client.result(false) if !@lock_path
-    client.delete(@lock_path).chain! do |value, result|
+    client.delete(@lock_path).chain do |value|
       @lock_path = nil
       @locked = false
-      result.set(true)
+      true
     end
   end
 
