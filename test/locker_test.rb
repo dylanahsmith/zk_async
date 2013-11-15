@@ -31,6 +31,15 @@ class LockerTest < ZkAsync::TestCase
     assert_equal false, locker.locked
   end
 
+  def test_shared_lock_with_other_shared_lock
+    lock2 = client.shared_locker("/lock")
+    lock2.lock(:wait => false).get
+    assert_equal true, @shared_locker.lock(:wait => false).get
+  ensure
+    @shared_locker.unlock.get
+    lock2.unlock.get
+  end
+
   def test_shared_lock_returns_false_without_lock_or_wait
     @exclusive_locker.lock(:wait => false).get
     assert_equal false, @shared_locker.lock(:wait => false).get
