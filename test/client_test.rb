@@ -21,6 +21,16 @@ class ClientTest < ZkAsync::TestCase
     assert_equal "hello", data
   end
 
+  def test_get_with_watch
+    client.create("/foo", :data => "hello", :ephemeral => true)
+    get_result, watch_result = client.get("/foo", :watch => true)
+    data, stat = get_result.get
+    assert_equal "hello", data
+    assert_equal false, watch_result.set?
+    client.set("/foo", "greetings")
+    assert_equal :changed, watch_result.get
+  end
+
   def test_set
     client.create("/foo", :data => "hello", :ephemeral => true)
 
@@ -42,12 +52,34 @@ class ClientTest < ZkAsync::TestCase
     client.delete("/dir/foo").wait
   end
 
+  def test_children_with_watch
+    client.create("/dir")
+    children_result, watch_result = client.children("/dir", :watch => true)
+    assert_equal [], children_result.get
+    assert_equal false, watch_result.set?
+    client.create("/dir/foo", :ephemeral => true)
+    assert_equal :child, watch_result.get
+  ensure
+    client.delete("/dir")
+    client.delete("/dir/foo").wait
+  end
+
   def test_stat
     client.create("/foo", :data => 'hello', :ephemeral => true).get
     stat = client.stat("/foo").get
     assert_equal true, stat.exists
     assert_equal 5, stat.data_length
     assert_equal 0, stat.num_children
+  end
+
+  def test_stat_with_watch
+    client.create("/foo", :data => "hello", :ephemeral => true)
+    stat_result, watch_result = client.stat("/foo", :watch => true)
+    assert_equal true, stat_result.get.exists
+
+    assert_equal false, watch_result.set?
+    client.delete("/foo")
+    assert_equal :deleted, watch_result.get
   end
 
   def test_stat_missing_node
@@ -60,7 +92,7 @@ class ClientTest < ZkAsync::TestCase
     assert_equal ZK::Exceptions::NoNode, client.stat("/foo").exception.class
   end
 
-  def test_mkdir_p_
+  def test_mkdir_p
     path = "/a/b/c/d/e"
     mkdir_result = client.mkdir_p(path)
     assert_equal path, mkdir_result.get

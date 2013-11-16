@@ -54,8 +54,8 @@ class ZkAsync::Client
   private
 
   class RequestCallback < Struct.new(:result, :method_name)
-    def initialize(method_name, &block)
-      self.result = ZkAsync::Result.new(&block)
+    def initialize(method_name)
+      self.result = ZkAsync::Result.new
       @method_name = method_name
     end
 
@@ -94,12 +94,31 @@ class ZkAsync::Client
     end
   end
 
-  def send_request(method_name, *args, &block)
-    callback = RequestCallback.new(method_name, &block)
+  WATCH_EVENT_TYPES = [nil, :created, :deleted, :changed, :child]
+
+  def register_watcher(method_name, path)
+    unless [:get, :stat, :children].include?(method_name)
+      raise ArgumentError, ":watch option only valid for get, stat, and children requests"
+    end
+    result = ZkAsync::Result.new
+    watch_type = method_name == :children ? :child : :node
+    subscription = @zk.register(path) do |event|
+      event_type = WATCH_EVENT_TYPES[event.type]
+      if (watch_type == :child) == (event_type == :child)
+        result.set(event_type)
+        subscription.unregister
+      end
+    end
+    result
+  end
+
+  def send_request(method_name, *args)
+    callback = RequestCallback.new(method_name)
     options = args.extract_options!
     options[:callback] = callback.method(:call)
+    watch_result = register_watcher(method_name, args.first) if options[:watch]
     args.push(options)
     @zk.send(method_name, *args)
-    callback.result
+    watch_result ? [callback.result, watch_result] : callback.result
   end
 end
