@@ -111,6 +111,7 @@ class ZkAsync::Result
     @callbacks.each do |callback|
       callback.call(value, exception)
     end
+    @callbacks = nil
     self
   end
 
@@ -118,7 +119,7 @@ class ZkAsync::Result
     begin
       ret = block.call(*args)
       if ret.is_a?(ZkAsync::Result)
-        ret.chain(result)
+        ret.chain(result) unless ret == result
       elsif ret.is_a?(Array) && ret.all?{ |item| item.is_a?(ZkAsync::Result) }
         self.class.new.group(ret).chain(result)
       else

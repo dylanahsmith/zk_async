@@ -42,12 +42,12 @@ class ZkAsync::Client
       .rescue(ZK::Exceptions::NoNode)
   end
 
-  def wait_until_deleted(path)
-    result, watch = exists?(path, :watch => true)
-    result.chain do |exists|
+  def wait_until_deleted(path, options={})
+    exists_result, watch = exists?(path, :watch => true)
+    wait_result = exists_result.chain(options[:result]) do |exists|
       if exists
-        watch.chain do |event|
-          event == :deleted ?  true : wait_until_deleted(path)
+        watch.chain(wait_result) do |event|
+          event == :deleted ?  true : wait_until_deleted(path, :result => wait_result)
         end
       else
         true
