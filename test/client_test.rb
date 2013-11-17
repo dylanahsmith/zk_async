@@ -155,6 +155,16 @@ class ClientTest < ZkAsync::TestCase
     assert_equal ZK::Exceptions::NoNode, client.stat("/a").exception.class
   end
 
+  def test_wait_until_deleted
+    assert_equal true, client.wait_until_deleted("/foo").get
+    client.create("/foo", :ephemeral => true).get
+    result = client.wait_until_deleted("/foo")
+    client.set("/foo", "force rewatch").get
+    assert_equal false, result.set?
+    client.delete("/foo").get
+    assert_equal true, result.get
+  end
+
   private
 
   def delete_empty_path(path)

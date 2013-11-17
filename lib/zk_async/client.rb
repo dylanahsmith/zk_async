@@ -41,6 +41,19 @@ class ZkAsync::Client
       .chain { delete(path) }
   end
 
+  def wait_until_deleted(path)
+    result, watch = exists?(path, :watch => true)
+    result.chain do |exists|
+      if exists
+        watch.chain do |event|
+          event == :deleted ?  true : wait_until_deleted(path)
+        end
+      else
+        true
+      end
+    end
+  end
+
   def result(value)
     ZkAsync::Result.new.set(value)
   end
