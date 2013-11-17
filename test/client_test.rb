@@ -92,6 +92,29 @@ class ClientTest < ZkAsync::TestCase
     assert_equal ZK::Exceptions::NoNode, client.stat("/foo").exception.class
   end
 
+  def test_mixed_watch
+    client.create("/dir")
+    client.create("/dir/foo", :ephemeral => true).get
+    children_result, child_watch = client.children("/dir", :watch => true)
+    stat_result, stat_watch = client.stat("/dir", :watch => true)
+
+    assert_equal ["foo"], children_result.get
+    assert_equal true, stat_result.get.exists
+    assert_equal false, child_watch.set?
+    assert_equal false, stat_watch.set?
+
+    client.delete("/dir/foo").get
+
+    assert_equal true, child_watch.set?
+    assert_equal :child, child_watch.get
+    assert_equal false, stat_watch.set?
+
+    client.delete("/dir").get
+
+    assert_equal true, stat_watch.set?
+    assert_equal :deleted, stat_watch.get
+  end
+
   def test_mkdir_p
     path = "/a/b/c/d/e"
     mkdir_result = client.mkdir_p(path)
