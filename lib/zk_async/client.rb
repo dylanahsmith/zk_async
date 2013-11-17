@@ -39,6 +39,7 @@ class ZkAsync::Client
     self.children(path)
       .chain { |children| children.map{ |child| rm_rf("#{path}/#{child}") } }
       .chain { delete(path) }
+      .rescue(ZK::Exceptions::NoNode)
   end
 
   def wait_until_deleted(path)

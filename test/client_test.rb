@@ -155,6 +155,10 @@ class ClientTest < ZkAsync::TestCase
     assert_equal ZK::Exceptions::NoNode, client.stat("/a").exception.class
   end
 
+  def test_rm_rf_on_missing_node
+    assert_equal nil, client.rm_rf("/a").exception
+  end
+
   def test_wait_until_deleted
     assert_equal true, client.wait_until_deleted("/foo").get
     client.create("/foo", :ephemeral => true).get
