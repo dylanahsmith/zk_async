@@ -115,6 +115,12 @@ class ClientTest < ZkAsync::TestCase
     assert_equal :deleted, stat_watch.get
   end
 
+  def test_exists?
+    assert_equal false, client.exists?("/foo").get
+    client.create("/foo", :ephemeral => true).get
+    assert_equal true, client.exists?("/foo").get
+  end
+
   def test_mkdir_p
     path = "/a/b/c/d/e"
     mkdir_result = client.mkdir_p(path)

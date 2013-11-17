@@ -3,14 +3,20 @@ class ZkAsync::Client
     @zk = zk
   end
 
-  def create(*args, &block); send_request(__method__, *args); end
-  def get(*args, &block); send_request(__method__, *args); end
-  def set(*args, &block); send_request(__method__, *args); end
-  def stat(*args, &block); send_request(__method__, *args); end
-  def children(*args, &block); send_request(__method__, *args); end
-  def delete(*args, &block); send_request(__method__, *args); end
-  def get_acl(*args, &block); send_request(__method__, *args); end
-  def set_acl(*args, &block); send_request(__method__, *args); end
+  def create(*args); send_request(__method__, *args); end
+  def get(*args); send_request(__method__, *args); end
+  def set(*args); send_request(__method__, *args); end
+  def stat(*args); send_request(__method__, *args); end
+  def children(*args); send_request(__method__, *args); end
+  def delete(*args); send_request(__method__, *args); end
+  def get_acl(*args); send_request(__method__, *args); end
+  def set_acl(*args); send_request(__method__, *args); end
+
+  def exists?(path, options={})
+    ret = Array(stat(path, options))
+    ret[0] = ret[0].chain { |stat| stat.exists }.rescue(ZK::Exceptions::NoNode) { false }
+    ret.length == 1 ? ret[0] : ret
+  end
 
   def create_path(path, options={})
     create(path, options).rescue(ZK::Exceptions::NoNode) do |exc|
