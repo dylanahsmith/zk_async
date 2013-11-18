@@ -9,3 +9,9 @@ Rake::TestTask.new(:test) do |t|
   t.test_files = FileList['test/**/*_test.rb']
   t.verbose = false
 end
+
+namespace :benchmark do
+  task :run do
+    ruby "./performance/benchmark.rb"
+  end
+end
