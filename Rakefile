@@ -15,3 +15,9 @@ namespace :benchmark do
     ruby "./performance/benchmark.rb"
   end
 end
+
+namespace :profile do
+  task :run do
+    ruby "./performance/profile.rb"
+  end
+end
